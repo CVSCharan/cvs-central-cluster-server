@@ -1,5 +1,5 @@
 import { Schema, Document } from "mongoose";
-import { secondaryConnection } from "../config/database";
+import { secondaryConnection } from "../../config/database";
 
 export interface ISecondaryModel extends Document {
   title: string;

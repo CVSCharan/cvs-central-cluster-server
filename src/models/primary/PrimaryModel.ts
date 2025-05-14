@@ -1,5 +1,5 @@
 import { Schema, Document } from 'mongoose';
-import { primaryConnection } from '../config/database';
+import { primaryConnection } from '../../config/database';
 
 export interface IPrimaryModel extends Document {
   name: string;
