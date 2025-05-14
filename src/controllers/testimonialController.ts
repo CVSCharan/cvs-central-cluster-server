@@ -61,6 +61,44 @@ class TestimonialController {
     }
   }
 
+  // Get all testimonials (public)
+  async getApprovedTestimonials(req: Request, res: Response): Promise<void> {
+    try {
+      // Get pagination parameters from query string
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      // Calculate skip value for pagination
+      const skip = (page - 1) * limit;
+
+      // Get testimonials with pagination
+      const { testimonials, totalCount } =
+        await testimonialService.getApprovedTestimonials(
+          page,
+          limit,
+          skip
+        );
+
+      // Calculate total pages
+      const totalPages = Math.ceil(totalCount / limit);
+
+      res.json({
+        success: true,
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        testimonials,
+      });
+    } catch (error) {
+      logger.error("Controller error fetching testimonials", {
+        error: (error as Error).message,
+      });
+      res.status(500).json({ message: "Server error fetching testimonials" });
+    }
+  }
+
   // Get all testimonials (admin)
   async getAllTestimonialsAdmin(req: Request, res: Response): Promise<void> {
     try {

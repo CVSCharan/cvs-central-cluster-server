@@ -1,5 +1,5 @@
-import { Project, IProject } from '../models/primary/Project';
-import logger from '../utils/logger';
+import { Project, IProject } from "../models/primary/Project";
+import logger from "../utils/logger";
 
 export interface IProjectCreate {
   title: string;
@@ -41,34 +41,34 @@ export class ProjectService {
    */
   async getAllProjects(query: any = {}): Promise<IProject[]> {
     try {
-      logger.info('Fetching all projects', { query });
-      
+      logger.info("Fetching all projects", { query });
+
       // Build filter object based on query parameters
       const filter: any = {};
-      
+
       if (query.category) {
         filter.category = query.category;
       }
-      
+
       if (query.isActive !== undefined) {
-        filter.isActive = query.isActive === 'true';
+        filter.isActive = query.isActive === "true";
       }
-      
+
       if (query.isFeatured !== undefined) {
-        filter.isFeatured = query.isFeatured === 'true';
+        filter.isFeatured = query.isFeatured === "true";
       }
-      
+
       // Add search functionality
       if (query.search) {
         filter.$or = [
-          { title: { $regex: query.search, $options: 'i' } },
-          { description: { $regex: query.search, $options: 'i' } }
+          { title: { $regex: query.search, $options: "i" } },
+          { description: { $regex: query.search, $options: "i" } },
         ];
       }
-      
+
       return await Project.find(filter).sort({ createdAt: -1 });
     } catch (error) {
-      logger.error('Error fetching projects', { error });
+      logger.error("Error fetching projects", { error });
       throw error;
     }
   }
@@ -104,18 +104,18 @@ export class ProjectService {
    */
   async createProject(data: IProjectCreate): Promise<IProject> {
     try {
-      logger.info('Creating new project', { data });
-      
+      logger.info("Creating new project", { data });
+
       // Check if slug already exists
       const existingProject = await Project.findOne({ slug: data.slug });
       if (existingProject) {
-        throw new Error('A project with this slug already exists');
+        throw new Error("A project with this slug already exists");
       }
-      
+
       const project = new Project(data);
       return await project.save();
     } catch (error) {
-      logger.error('Error creating project', { error, data });
+      logger.error("Error creating project", { error, data });
       throw error;
     }
   }
@@ -123,22 +123,25 @@ export class ProjectService {
   /**
    * Update a project
    */
-  async updateProject(id: string, data: IProjectUpdate): Promise<IProject | null> {
+  async updateProject(
+    id: string,
+    data: IProjectUpdate
+  ): Promise<IProject | null> {
     try {
       logger.info(`Updating project with id: ${id}`, { data });
-      
+
       // If slug is being updated, check if it already exists
       if (data.slug) {
-        const existingProject = await Project.findOne({ 
+        const existingProject = await Project.findOne({
           slug: data.slug,
-          _id: { $ne: id } // Exclude current project
+          _id: { $ne: id }, // Exclude current project
         });
-        
+
         if (existingProject) {
-          throw new Error('A project with this slug already exists');
+          throw new Error("A project with this slug already exists");
         }
       }
-      
+
       return await Project.findByIdAndUpdate(
         id,
         { $set: data },
@@ -172,11 +175,14 @@ export class ProjectService {
       if (!project) {
         return null;
       }
-      
+
       project.isFeatured = !project.isFeatured;
       return await project.save();
     } catch (error) {
-      logger.error(`Error toggling featured status for project with id: ${id}`, { error });
+      logger.error(
+        `Error toggling featured status for project with id: ${id}`,
+        { error }
+      );
       throw error;
     }
   }
@@ -190,11 +196,13 @@ export class ProjectService {
       if (!project) {
         return null;
       }
-      
+
       project.isActive = !project.isActive;
       return await project.save();
     } catch (error) {
-      logger.error(`Error toggling active status for project with id: ${id}`, { error });
+      logger.error(`Error toggling active status for project with id: ${id}`, {
+        error,
+      });
       throw error;
     }
   }

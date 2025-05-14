@@ -63,6 +63,28 @@ class TestimonialService {
     }
   }
 
+  // Get all testimonials (with optional filter for approved only)
+  async getApprovedTestimonials(page: number, limit: number, skip: number) {
+    try {
+      logger.info("Fetching approved testimonials");
+
+      const totalCount = await Testimonial.countDocuments({ isApproved: true });
+
+      const testimonials = await Testimonial.find({ isApproved: true })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("user", "name picture");
+
+      return { testimonials, totalCount };
+    } catch (error) {
+      logger.error("Error fetching approved testimonials", {
+        error: (error as Error).message,
+      });
+      throw error;
+    }
+  }
+
   // Get testimonials by user ID
   async getUserTestimonials(userId: string): Promise<ITestimonial[]> {
     try {

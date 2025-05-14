@@ -6,7 +6,7 @@ const router = express.Router();
 
 // Public routes
 router.get("/", testimonialController.getAllTestimonials);
-router.get("/approved", testimonialController.getAllTestimonials);
+router.get("/approved", testimonialController.getApprovedTestimonials);
 router.get("/:id", testimonialController.getTestimonialById);
 
 // Protected routes (require authentication)
