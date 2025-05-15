@@ -14,16 +14,21 @@ async function initialize() {
     // Wait for database connections to be established
     logger.info("Connecting to databases...");
 
-    // Create promises for database connections
-    const connectPrimary = new Promise<void>((resolve, reject) => {
-      primaryConnection.once("connected", () => {
-        logger.info("Primary database connected");
-        resolve();
-      });
-      primaryConnection.once("error", (err) => {
-        reject(new Error(`Primary database connection error: ${err.message}`));
-      });
-    });
+    // Create promises for database connections with timeouts
+    const connectPrimary = Promise.race([
+      new Promise<void>((resolve, reject) => {
+        primaryConnection.once("connected", () => {
+          logger.info("Primary database connected");
+          resolve();
+        });
+        primaryConnection.once("error", (err) => {
+          reject(new Error(`Primary database connection error: ${err.message}`));
+        });
+      }),
+      new Promise<void>((_, reject) => 
+        setTimeout(() => reject(new Error("Primary database connection timeout - is MongoDB running?")), 5000)
+      )
+    ]);
 
     const connectSecondary = new Promise<void>((resolve, reject) => {
       secondaryConnection.once("connected", () => {

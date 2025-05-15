@@ -1,31 +1,41 @@
-import express from "express";
+import { Router } from "express";
 import userController from "../controllers/userController";
-import { auth, adminOnly } from "../middleware/authMiddleware";
+import { auth } from "../middleware/authMiddleware";
+import passport from "passport";
 
-const router = express.Router();
+const router = Router();
 
-// Public routes
+// Regular routes
 router.post("/register", userController.register);
 router.post("/login", userController.login);
 router.get("/verify/:token", userController.verifyEmail);
-router.post("/forgot-password", userController.requestPasswordReset);
-router.post("/reset-password/:token", userController.resetPassword);
 
-// Protected routes (require authentication)
-router.get("/me", auth, userController.getCurrentUser);
-router.put("/profile", auth, userController.updateProfile);
-router.post("/change-password", auth, userController.changePassword);
-router.delete("/account", auth, userController.deleteAccount);
-
-// Admin routes
-router.get("/admin/users", auth, adminOnly, userController.getAllUsers);
-router.get("/admin/users/:id", auth, adminOnly, userController.getUserById);
-router.put("/admin/users/:id", auth, adminOnly, userController.adminUpdateUser);
-router.delete(
-  "/admin/users/:id",
-  auth,
-  adminOnly,
-  userController.adminDeleteUser
+// OAuth routes with Passport
+router.get(
+  "/login/google",
+  passport.authenticate("google", { scope: ["profile", "email"] })
 );
+router.get(
+  "/register/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    state: "register",
+  })
+);
+
+router.get(
+  "/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: "/login",
+    session: true,
+  }),
+  userController.googleCallback
+);
+
+router.post("/set-password", auth, userController.setPasswordForOAuthUser);
+
+// User info and logout
+router.get("/me", userController.getCurrentUser);
+router.get("/logout", userController.logout);
 
 export default router;

@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import userService from "../services/userService";
 import logger from "../utils/logger";
-import { User } from "../models/primary/User";
+import { IUser, User } from "../models/primary/User";
+import jwt from "jsonwebtoken";
 
 class UserController {
   // Register new user
@@ -168,8 +169,30 @@ class UserController {
   // Get current user profile
   async getCurrentUser(req: Request, res: Response): Promise<void> {
     try {
+      const user = await User.findById(req.user._id).select("-password");
+
+      if (!user) {
+        logger.warn("User not found for token", {
+          userId: req.user._id,
+        });
+        res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+        return;
+      }
       // User is already attached to req by auth middleware
-      res.status(200).json({ user: req.user });
+      res.status(200).json({
+        success: true,
+        token: req.token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          picture: user.picture,
+          isAdmin: user.isAdmin,
+        },
+      });
     } catch (error) {
       logger.error("Get current user error", {
         error: (error as Error).message,
@@ -329,6 +352,138 @@ class UserController {
         error: (error as Error).message,
       });
       res.status(500).json({ message: "Server error deleting user" });
+    }
+  }
+
+  // Google Login
+  async googleLogin(_req: Request, res: Response): Promise<void> {
+    try {
+      logger.info("Initiating Google login flow");
+      const authUrl = await userService.getGoogleOAuthUrl("login");
+      res.redirect(authUrl);
+    } catch (error) {
+      logger.error("Error initiating Google login flow", {
+        error: (error as Error).message,
+      });
+      res.status(500).json({
+        success: false,
+        message: "Server Error",
+        error: (error as Error).message,
+      });
+    }
+  }
+
+  // Google Registration
+  async googleRegister(_req: Request, res: Response): Promise<void> {
+    try {
+      logger.info("Initiating Google registration flow");
+      const authUrl = await userService.getGoogleOAuthUrl("register");
+      res.redirect(authUrl);
+    } catch (error) {
+      logger.error("Error initiating Google registration flow", {
+        error: (error as Error).message,
+      });
+      res.status(500).json({
+        success: false,
+        message: "Server Error",
+        error: (error as Error).message,
+      });
+    }
+  }
+
+  // Google Callback - Now using Passport
+  async googleCallback(req: Request, res: Response): Promise<void> {
+    try {
+      logger.info("Processing Google OAuth callback", {
+        callbackUrl: req.originalUrl,
+        headers: req.headers.host,
+      });
+      const user = req.user as IUser;
+
+      if (!user) {
+        throw new Error("Authentication failed");
+      }
+
+      // Generate JWT token for API access
+      const token = jwt.sign(
+        { userId: user._id },
+        process.env.JWT_SECRET || "your-secret-key",
+        { expiresIn: "1d" }
+      );
+
+      logger.info(`Google authentication successful for user: ${user.email}`);
+
+      // Ensure token is properly encoded for URL
+      const encodedToken = encodeURIComponent(token);
+      // Redirect with token as query parameter
+      const redirectUrl = `${
+        process.env.FRONTEND_URL || "http://localhost:3000"
+      }/auth/success?token=${encodedToken}`;
+      logger.debug(`Redirecting to: ${redirectUrl}`);
+
+      res.redirect(redirectUrl);
+    } catch (error) {
+      logger.error("Google OAuth callback error:", {
+        error: (error as Error).message,
+        stack: (error as Error).stack,
+      });
+
+      const errorMessage = encodeURIComponent((error as Error).message);
+      // Redirect with error message as query parameter
+      res.redirect(
+        `${
+          process.env.FRONTEND_URL || "http://localhost:3000"
+        }/auth/error?message=${errorMessage}`
+      );
+    }
+  }
+
+  // Update logout to handle both session and JWT
+  async logout(req: Request, res: Response): Promise<void> {
+    try {
+      // Clear session
+      req.logout((err) => {
+        if (err) {
+          logger.error("Error during logout", { error: err.message });
+        }
+      });
+
+      // Clear JWT cookie if it exists
+      res.clearCookie("token");
+
+      res.status(200).json({ message: "Logged out successfully" });
+    } catch (error) {
+      logger.error("Logout error", { error: (error as Error).message });
+      res.status(500).json({ message: "Server error during logout" });
+    }
+  }
+
+  // Set password for OAuth user
+  async setPasswordForOAuthUser(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user._id;
+      const { password } = req.body;
+
+      if (!password) {
+        res.status(400).json({ message: "Password is required" });
+        return;
+      }
+
+      await userService.setPasswordForOAuthUser(userId, password);
+
+      res.status(200).json({ message: "Password set successfully" });
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+
+      if (errorMessage === "User already has a password") {
+        res.status(400).json({ message: errorMessage });
+        return;
+      }
+
+      logger.error("Set password for OAuth user error", {
+        error: errorMessage,
+      });
+      res.status(500).json({ message: "Server error setting password" });
     }
   }
 }

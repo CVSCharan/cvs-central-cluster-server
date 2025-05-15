@@ -450,6 +450,230 @@ class UserService {
       throw error;
     }
   }
+
+  // Get Google OAuth URL
+  async getGoogleOAuthUrl(state: string = "login"): Promise<string> {
+    logger.info(`Generating Google OAuth URL for ${state}`);
+    const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+    const options = {
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      access_type: "offline",
+      response_type: "code",
+      prompt: "consent",
+      scope: [
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/userinfo.email",
+      ].join(" "),
+      state, // Indicate if this is a registration or login attempt
+    };
+
+    const queryString = new URLSearchParams({
+      redirect_uri: options.redirect_uri || "",
+      client_id: options.client_id || "",
+      access_type: options.access_type,
+      response_type: options.response_type,
+      prompt: options.prompt,
+      scope: options.scope,
+      state: options.state,
+    }).toString();
+    
+    logger.debug(`Google OAuth URL generated for ${state}`, {
+      redirect_uri: options.redirect_uri,
+    });
+    return `${rootUrl}?${queryString}`;
+  }
+
+  // Handle Google OAuth callback
+  async handleGoogleCallback(
+    code: string,
+    isRegistration: boolean
+  ): Promise<{ user: IUser; token: string }> {
+    try {
+      logger.info("Handling Google callback", { isRegistration });
+
+      // Exchange code for tokens
+      const tokenResponse = await this.exchangeCodeForTokens(code);
+      
+      // Get user info from Google
+      const googleUser = await this.getGoogleUserInfo(tokenResponse.access_token);
+      
+      // Find or create user
+      let user = await User.findOne({ email: googleUser.email });
+      
+      if (!user) {
+        // Create new user if not exists
+        user = new User({
+          email: googleUser.email,
+          name: googleUser.name,
+          picture: googleUser.picture,
+          provider: "google",
+          providerId: googleUser.id,
+          isVerified: true,
+        });
+        
+        await user.save();
+        logger.info("New user created via Google OAuth", { userId: user._id });
+      } else if (user.provider !== "google") {
+        // If user exists with different provider
+        if (isRegistration) {
+          // Update provider if it was local and not verified
+          if (user.provider === "local" && !user.isVerified) {
+            user.provider = "google";
+            user.providerId = googleUser.id;
+            user.isVerified = true;
+            user.verificationToken = undefined;
+            await user.save();
+            logger.info("Updated user to use Google provider", { userId: user._id });
+          } else {
+            throw new Error(`Account already exists with ${user.provider}. Please sign in with that provider.`);
+          }
+        } else {
+          throw new Error(`Please sign in with your ${user.provider} account.`);
+        }
+      }
+      
+      // Generate JWT token
+      const payload: TokenPayload = {
+        userId: user._id?.toString() || user.id || "",
+        email: user.email,
+        role: user.role,
+        isAdmin: user.isAdmin,
+      };
+      
+      const token = jwt.sign(
+        payload,
+        process.env.JWT_SECRET || "your-default-secret",
+        { expiresIn: "1d" }
+      );
+      
+      return { user, token };
+    } catch (error) {
+      logger.error("Error handling Google callback", {
+        error: (error as Error).message,
+      });
+      throw error;
+    }
+  }
+  
+  // Helper method to exchange code for tokens
+  private async exchangeCodeForTokens(code: string): Promise<any> {
+    try {
+      const tokenUrl = "https://oauth2.googleapis.com/token";
+      const params = new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI || "",
+        grant_type: "authorization_code",
+      });
+      
+      // Log the request parameters (remove client_secret in production)
+      logger.info("OAuth token exchange parameters", {
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+        grant_type: "authorization_code",
+        code_length: code.length
+      });
+      
+      const response = await fetch(tokenUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { raw_response: errorText };
+        }
+        
+        logger.error("Detailed OAuth error", {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        });
+        
+        throw new Error(`Failed to exchange code: ${errorData.error_description || response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      logger.error("Error exchanging code for tokens", {
+        error: (error as Error).message,
+      });
+      throw error;
+    }
+  }
+  
+  // Helper method to get user info from Google
+  private async getGoogleUserInfo(accessToken: string): Promise<any> {
+    try {
+      const userInfoUrl = "https://www.googleapis.com/oauth2/v2/userinfo";
+      const response = await fetch(userInfoUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to get user info: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      logger.error("Error getting Google user info", {
+        error: (error as Error).message,
+      });
+      throw error;
+    }
+  }
+
+  // Set password for OAuth user
+  async setPasswordForOAuthUser(
+    userId: string,
+    password: string
+  ): Promise<IUser> {
+    try {
+      logger.info("Setting password for OAuth user", { userId });
+
+      const user = await User.findById(userId);
+      if (!user) {
+        logger.warn("Set password failed: User not found", { userId });
+        throw new Error("User not found");
+      }
+
+      // Check if user already has a password
+      if (user.password) {
+        logger.warn("Set password failed: User already has a password", {
+          userId,
+        });
+        throw new Error("User already has a password");
+      }
+
+      // Hash new password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+
+      // Update user password
+      user.password = hashedPassword;
+      await user.save();
+
+      logger.info("Password set successfully for OAuth user", { userId });
+      return user;
+    } catch (error) {
+      logger.error("Error setting password for OAuth user", {
+        error: (error as Error).message,
+        userId,
+      });
+      throw error;
+    }
+  }
 }
 
 export default new UserService();

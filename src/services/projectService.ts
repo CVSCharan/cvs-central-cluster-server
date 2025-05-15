@@ -39,36 +39,74 @@ export class ProjectService {
   /**
    * Get all projects
    */
-  async getAllProjects(query: any = {}): Promise<IProject[]> {
+  async getAllProjects(
+    page: number,
+    limit: number,
+    skip: number
+  ): Promise<{ projects: IProject[]; totalCount: number }> {
     try {
-      logger.info("Fetching all projects", { query });
+      logger.info("Fetching all projects");
 
-      // Build filter object based on query parameters
-      const filter: any = {};
+      const totalCount = await Project.countDocuments();
 
-      if (query.category) {
-        filter.category = query.category;
-      }
+      const projects = await Project.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
 
-      if (query.isActive !== undefined) {
-        filter.isActive = query.isActive === "true";
-      }
-
-      if (query.isFeatured !== undefined) {
-        filter.isFeatured = query.isFeatured === "true";
-      }
-
-      // Add search functionality
-      if (query.search) {
-        filter.$or = [
-          { title: { $regex: query.search, $options: "i" } },
-          { description: { $regex: query.search, $options: "i" } },
-        ];
-      }
-
-      return await Project.find(filter).sort({ createdAt: -1 });
+      return { projects, totalCount };
     } catch (error) {
-      logger.error("Error fetching projects", { error });
+      logger.error("Error fetching all projects", { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get active projects
+   */
+  async getActiveProjects(
+    page: number,
+    limit: number,
+    skip: number
+  ): Promise<{ projects: IProject[]; totalCount: number }> {
+    try {
+      logger.info("Fetching active projects");
+
+      const totalCount = await Project.countDocuments({ isActive: true });
+
+      const projects = await Project.find({ isActive: true })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      return { projects, totalCount };
+    } catch (error) {
+      logger.error("Error fetching active projects", { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get featured projects
+   */
+  async getFeaturedProjects(
+    page: number,
+    limit: number,
+    skip: number
+  ): Promise<{ projects: IProject[]; totalCount: number }> {
+    try {
+      logger.info("Fetching active projects");
+
+      const totalCount = await Project.countDocuments({ isFeatured: true });
+
+      const projects = await Project.find({ isFeatured: true })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      return { projects, totalCount };
+    } catch (error) {
+      logger.error("Error fetching active projects", { error });
       throw error;
     }
   }

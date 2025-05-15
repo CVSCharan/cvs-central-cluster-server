@@ -73,16 +73,12 @@ class TestimonialController {
 
       // Get testimonials with pagination
       const { testimonials, totalCount } =
-        await testimonialService.getApprovedTestimonials(
-          page,
-          limit,
-          skip
-        );
+        await testimonialService.getApprovedTestimonials(page, limit, skip);
 
       // Calculate total pages
       const totalPages = Math.ceil(totalCount / limit);
 
-      res.json({
+      res.status(200).json({
         success: true,
         currentPage: page,
         totalPages,

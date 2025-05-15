@@ -6,6 +6,14 @@ const router = Router();
 
 // Get all projects
 router.get("/", projectController.getAllProjects.bind(projectController));
+router.get(
+  "/active",
+  projectController.getActiveProjects.bind(projectController)
+);
+router.get(
+  "/featured",
+  projectController.getFeaturedProjects.bind(projectController)
+);
 
 // Get project by ID
 router.get("/id/:id", projectController.getProjectById.bind(projectController));

@@ -64,7 +64,11 @@ class TestimonialService {
   }
 
   // Get all testimonials (with optional filter for approved only)
-  async getApprovedTestimonials(page: number, limit: number, skip: number) {
+  async getApprovedTestimonials(
+    page: number,
+    limit: number,
+    skip: number
+  ): Promise<{ testimonials: ITestimonial[]; totalCount: number }> {
     try {
       logger.info("Fetching approved testimonials");
 
