@@ -1,6 +1,6 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { User, IUser } from "../models/primary/User";
+import { User } from "../models/primary/User";
 import logger from "../utils/logger";
 
 // Serialize user to store in session
@@ -28,7 +28,7 @@ passport.use(
       clientID: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
       callbackURL:
-        process.env.GOOGLE_REDIRECT_URI || "/api/v1/auth/google/callback",
+        process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/v1/auth/google/callback",
       scope: ["profile", "email"],
     },
     async (accessToken, refreshToken, profile, done) => {
