@@ -28,7 +28,8 @@ export const startServer = () => {
   // Session configuration
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || "your-session-secret",
+      secret:
+        process.env.SESSION_SECRET || "cvs-central-cluster-session-secret",
       resave: false,
       saveUninitialized: false,
       store: MongoStore.create({

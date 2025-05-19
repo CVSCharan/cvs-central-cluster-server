@@ -27,70 +27,57 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      callbackURL:
-        process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/v1/auth/google/callback",
+      callbackURL: process.env.GOOGLE_REDIRECT_URI, // No fallback
       scope: ["profile", "email"],
+      passReqToCallback: true, // To access `req` in the verify callback
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
-        logger.info(`Google OAuth login attempt`, {
+        if (!profile._json?.email) {
+          throw new Error("Email permission required");
+        }
+
+        logger.info("Google OAuth attempt", {
           email: profile._json.email,
+          providerId: profile.id,
         });
 
-        // Check if user exists
         let user = await User.findOne({ email: profile._json.email });
 
         if (user) {
-          // If user exists but used different provider
+          // Existing user with different provider
           if (user.provider !== "google") {
-            logger.info("User exists with different provider", {
-              email: profile._json.email,
-              existingProvider: user.provider,
-            });
-
-            // Update provider if it was local and not verified
             if (user.provider === "local" && !user.isVerified) {
+              // Migrate unverified local user to Google
               user.provider = "google";
               user.providerId = profile.id;
               user.isVerified = true;
-              user.verificationToken = undefined;
               await user.save();
             } else {
-              logger.warn(
-                "OAuth login failed: Account exists with different provider",
-                {
-                  email: profile._json.email,
-                  provider: user.provider,
-                }
-              );
+              logger.warn("Account exists with different provider", {
+                existingProvider: user.provider,
+              });
               return done(
-                new Error(
-                  `You already have an account with ${user.provider}. Please sign in with that provider.`
-                ),
+                new Error(`Sign in with ${user.provider} instead.`),
                 undefined
               );
             }
           }
         } else {
-          // Create new user if doesn't exist
+          // New user
           user = new User({
             email: profile._json.email,
             name: profile.displayName,
-            picture: profile._json.picture,
             provider: "google",
             providerId: profile.id,
             isVerified: true,
           });
-
           await user.save();
-          logger.info("New user created via Google OAuth", {
-            userId: user._id,
-          });
         }
 
         return done(null, user);
       } catch (error) {
-        logger.error("Error during Google OAuth", {
+        logger.error("Google OAuth failed", {
           error: (error as Error).message,
         });
         return done(error as Error, undefined);
