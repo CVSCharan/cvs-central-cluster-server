@@ -20,7 +20,12 @@ export const startServer = () => {
   const port = process.env.PORT || 5000;
 
   app.use(helmet());
-  app.use(cors({ origin: ["http://localhost:3000"], credentials: true }));
+  app.use(
+    cors({
+      origin: process.env.CORS_ORIGIN?.split(",") || ["http://localhost:3000"],
+      credentials: true,
+    })
+  );
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(requestLogger);
@@ -56,12 +61,12 @@ export const startServer = () => {
 
   app.use("/api/v1", apiRoutes);
 
-  if (process.env.NODE_ENV === "production") {
-    app.use(express.static(path.join(__dirname, "../frontend")));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(__dirname, "../frontend/index.html"));
-    });
-  }
+  // if (process.env.NODE_ENV === "production") {
+  //   app.use(express.static(path.join(__dirname, "../frontend")));
+  //   app.get("*", (_req, res) => {
+  //     res.sendFile(path.join(__dirname, "../frontend/index.html"));
+  //   });
+  // }
 
   app.listen(port, () => {
     logger.info(`⚡️ Server is running at http://localhost:${port}`);
