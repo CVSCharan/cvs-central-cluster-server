@@ -31,7 +31,7 @@ export const startServer = () => {
       secret:
         process.env.SESSION_SECRET || "cvs-central-cluster-session-secret",
       resave: false,
-      saveUninitialized: false,
+      saveUninitialized: true, // Changed from false to true
       store: MongoStore.create({
         // Use existing connection instead of creating a new one
         clientPromise: Promise.resolve(primaryConnection.getClient()),
