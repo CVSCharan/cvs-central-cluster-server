@@ -21,12 +21,27 @@ export const startServer = () => {
   app.use(helmet());
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN?.split(",") || [
-        "http://localhost:3000",
-        "http://localhost:8080",
-        "https://cvs-central-cluster-server.onrender.com",
-      ],
+      origin: function(origin, callback) {
+        const allowedOrigins = process.env.CORS_ORIGIN?.split(",") || [
+          "http://localhost:3000",
+          "http://localhost:8080",
+          "https://cvs-central-cluster-server.onrender.com",
+          "https://cvs-central-cluster.onrender.com"
+        ];
+        
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+          return callback(null, true);
+        } else {
+          console.log("Blocked by CORS: ", origin);
+          return callback(null, false);
+        }
+      },
       credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
     })
   );
   app.use(express.json());
@@ -45,10 +60,8 @@ export const startServer = () => {
         clientPromise: Promise.resolve(primaryConnection.getClient()),
         ttl: 14 * 24 * 60 * 60, // 14 days
         collectionName: "sessions", // Use this to specify the collection name
-        crypto: {
-          secret:
-            process.env.SESSION_SECRET || "cvs-central-cluster-session-secret",
-        },
+        // Remove the crypto configuration to avoid encryption issues
+        // If you want to use encryption, you need to clear the collection first
         touchAfter: 24 * 3600, // Only update sessions once per day unless data changes
         autoRemove: "native", // Use MongoDB's TTL index
         autoRemoveInterval: 10, // Check expired sessions every 10 minutes
