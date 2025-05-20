@@ -61,12 +61,18 @@ export const startServer = () => {
 
   app.use("/api/v1", apiRoutes);
 
-  // if (process.env.NODE_ENV === "production") {
-  //   app.use(express.static(path.join(__dirname, "../frontend")));
-  //   app.get("*", (_req, res) => {
-  //     res.sendFile(path.join(__dirname, "../frontend/index.html"));
-  //   });
-  // }
+  // Serve static files and handle client-side routing
+  if (process.env.NODE_ENV === "production") {
+    app.use(express.static(path.join(__dirname, "../frontend")));
+    app.get("/", (_req, res) => {
+      res.sendFile(path.join(__dirname, "../frontend/index.html"));
+    });
+  } else {
+    // Development welcome page
+    app.get("/", (_req, res) => {
+      res.sendFile(path.join(__dirname, "../frontend/index.html"));
+    });
+  }
 
   app.listen(port, () => {
     logger.info(`⚡️ Server is running at http://localhost:${port}`);
