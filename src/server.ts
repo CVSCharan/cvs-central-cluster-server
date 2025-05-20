@@ -21,7 +21,11 @@ export const startServer = () => {
   app.use(helmet());
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN?.split(",") || ["http://localhost:3000"],
+      origin: process.env.CORS_ORIGIN?.split(",") || [
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "https://cvs-central-cluster-server.onrender.com",
+      ],
       credentials: true,
     })
   );
@@ -42,11 +46,12 @@ export const startServer = () => {
         ttl: 14 * 24 * 60 * 60, // 14 days
         collectionName: "sessions", // Use this to specify the collection name
         crypto: {
-          secret: process.env.SESSION_SECRET || "cvs-central-cluster-session-secret"
+          secret:
+            process.env.SESSION_SECRET || "cvs-central-cluster-session-secret",
         },
         touchAfter: 24 * 3600, // Only update sessions once per day unless data changes
-        autoRemove: 'native', // Use MongoDB's TTL index
-        autoRemoveInterval: 10 // Check expired sessions every 10 minutes
+        autoRemove: "native", // Use MongoDB's TTL index
+        autoRemoveInterval: 10, // Check expired sessions every 10 minutes
       }),
       cookie: {
         secure: process.env.NODE_ENV === "production",
